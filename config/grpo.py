@@ -72,7 +72,8 @@ def general_ocr_wan2_1():
     config.save_dir = f'logs/video_ocr/{config.run_name}'
     config.resume_from = None
     config.reward_fn = {
-        "video_ocr": 1.0,
+        "video_ocr": 0.7,
+        "aesthetic": 0.3,
     }
     
     config.prompt_fn = "general_ocr"

@@ -34,12 +34,34 @@ def aesthetic_score():
     scorer = AestheticScorer(dtype=torch.float32).cuda()
 
     def _fn(images, prompts, metadata):
+        is_video = False
+        batch_size = None
+
         if isinstance(images, torch.Tensor):
+            # Check if input is video (5D tensor: B, F, C, H, W)
+            if images.dim() == 5 and images.shape[2] == 3:
+                is_video = True
+                batch_size, num_frames, C, H, W = images.shape
+                # Sample frames (every 4th frame to reduce computation)
+                frame_indices = list(range(0, num_frames, 4))
+                if len(frame_indices) == 0:
+                    frame_indices = [0]  # At least sample first frame
+                # Sample frames and reshape to (B * num_sampled_frames, C, H, W)
+                sampled_frames = images[:, frame_indices]  # (B, num_sampled, C, H, W)
+                images = sampled_frames.reshape(-1, C, H, W)  # (B * num_sampled, C, H, W)
+
             images = (images * 255).round().clamp(0, 255).to(torch.uint8)
         else:
             images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
             images = torch.tensor(images, dtype=torch.uint8)
+
         scores = scorer(images)
+
+        # If video, average scores across frames for each video
+        if is_video:
+            num_sampled_frames = len(frame_indices)
+            scores = scores.reshape(batch_size, num_sampled_frames).mean(dim=1)
+
         return scores, {}
 
     return _fn
