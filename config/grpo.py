@@ -75,10 +75,39 @@ def general_ocr_wan2_1():
         "video_ocr": 0.7,
         "aesthetic": 0.3,
     }
-    
+
     config.prompt_fn = "general_ocr"
 
     config.per_prompt_stat_tracking = True
+    return config
+
+def test_wan2_1_videoalign():
+    """
+    Test configuration for wan2.1 OCR video training with VideoAlign reward
+    Uses multi-reward GRPO with video_ocr, aesthetic, and videoalign rewards
+    """
+    config = general_ocr_wan2_1()
+
+    # Update run name for this test
+    config.run_name = "wan_videoalign_test"
+
+    # Configure multi-reward with VideoAlign
+    config.reward_fn = {
+        "video_ocr": 0.5,      # OCR accuracy
+        "aesthetic": 0.2,       # Visual aesthetics
+        "videoalign": 0.3,      # Video quality (VQ + MQ + TA)
+    }
+
+    # Reduce batch sizes for testing
+    config.sample.train_batch_size = 4
+    config.sample.num_image_per_prompt = 2
+    config.sample.num_batches_per_epoch = 1
+    config.train.batch_size = config.sample.train_batch_size
+    config.train.gradient_accumulation_steps = 1
+
+    # Update save directory
+    config.save_dir = f'logs/video_ocr/{config.run_name}'
+
     return config
 
 def general_ocr_sd3():

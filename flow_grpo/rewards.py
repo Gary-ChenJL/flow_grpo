@@ -180,6 +180,47 @@ def video_ocr_score(device):
 
     return _fn
 
+def videoalign_score(device):
+    """
+    VideoAlign reward model for video quality assessment
+    Evaluates videos on three dimensions: Visual Quality (VQ), Motion Quality (MQ), and Text Alignment (TA)
+    Based on https://github.com/KlingTeam/VideoAlign
+    """
+    from flow_grpo.videoalign_scorer import VideoAlignScorer
+
+    scorer = VideoAlignScorer(
+        checkpoint_path="hf_cache/VideoReward",
+        device=device,
+        dtype=torch.bfloat16
+    )
+
+    def _fn(images, prompts, metadata):
+        # VideoAlign expects video tensors
+        if isinstance(images, torch.Tensor):
+            # Handle both image and video inputs
+            if images.dim() == 4:
+                # Image input (B, C, H, W) - convert to video by adding frame dimension
+                images = images.unsqueeze(1)  # (B, 1, C, H, W)
+            elif images.dim() == 5:
+                # Video input (B, F, C, H, W) - already in correct format
+                pass
+            else:
+                raise ValueError(f"Unexpected tensor dimensions: {images.dim()}")
+        else:
+            # Handle numpy array input
+            images = torch.from_numpy(images)
+            if images.dim() == 4:
+                # Assume (B, H, W, C) format from numpy
+                images = images.permute(0, 3, 1, 2).unsqueeze(1)  # (B, 1, C, H, W)
+
+        # Get scores from VideoAlign model
+        # Returns Overall score which is sum of VQ + MQ + TA (normalized)
+        scores = scorer(images, prompts, return_details=False)
+
+        return scores, {}
+
+    return _fn
+
 def deqa_score_remote(device):
     """Submits images to DeQA and computes a reward.
     """
@@ -434,6 +475,7 @@ def multi_score(device, score_dict):
         "deqa": deqa_score_remote,
         "ocr": ocr_score,
         "video_ocr": video_ocr_score,
+        "videoalign": videoalign_score,
         "imagereward": imagereward_score,
         "pickscore": pickscore_score,
         "qwenvl": qwenvl_score,
