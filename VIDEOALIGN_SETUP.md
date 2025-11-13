@@ -13,32 +13,55 @@ The model is based on Qwen2-VL-2B-Instruct and provides normalized scores for ea
 
 ## Installation
 
-### 1. Clone VideoAlign Repository
+### Quick Install (Recommended)
+
+Use the automated installation script:
+
+```bash
+cd /home/user/flow_grpo
+./scripts/install_videoalign.sh
+```
+
+This script will:
+1. Clone VideoAlign repository (if not already cloned)
+2. Upgrade transformers to support Qwen2-VL (>= 4.45.0)
+3. Install all required dependencies
+4. Install VideoAlign in editable mode
+5. Verify the installation
+
+### Manual Installation
+
+If you prefer to install manually:
+
+#### 1. Clone VideoAlign Repository
 
 ```bash
 cd /home/user/flow_grpo
 git clone https://github.com/KlingTeam/VideoAlign
 ```
 
-### 2. Install Dependencies
+#### 2. Upgrade transformers (CRITICAL!)
 
-VideoAlign requires specific dependencies. If you're using a conda environment:
+VideoAlign uses Qwen2-VL which requires transformers >= 4.45.0:
+
+```bash
+pip install --upgrade "transformers>=4.45.0"
+```
+
+**Common Error:** If you see `cannot import name 'Qwen2VLForConditionalGeneration'`, your transformers is too old!
+
+#### 3. Install VideoAlign Dependencies
 
 ```bash
 cd VideoAlign
-conda env update -f environment.yaml -n your_env_name
-pip install flash-attn==2.5.8 --no-build-isolation
+pip install -e .
+pip install qwen-vl-utils einops torchvision Pillow
+pip install flash-attn==2.5.8 --no-build-isolation  # Optional but recommended
+pip install opencv-python  # For video saving in flow_grpo
 cd ..
 ```
 
-Or install the key dependencies manually:
-```bash
-pip install torch transformers
-pip install flash-attn==2.5.8 --no-build-isolation
-pip install opencv-python  # For video saving
-```
-
-### 3. Download VideoAlign Model Checkpoint
+#### 4. Download VideoAlign Model Checkpoint
 
 ```bash
 mkdir -p hf_cache
@@ -168,6 +191,31 @@ config.reward_fn = {
 
 ## Troubleshooting
 
+### Qwen2VL Import Error (Most Common)
+
+**Error:** `cannot import name 'Qwen2VLForConditionalGeneration' from 'transformers'`
+
+**Cause:** Your transformers library is too old (< 4.45.0)
+
+**Solution:**
+```bash
+# Quick fix - run the install script
+./scripts/install_videoalign.sh
+
+# Or manually upgrade transformers
+pip install --upgrade "transformers>=4.45.0"
+
+# Then install VideoAlign
+cd VideoAlign
+pip install -e .
+cd ..
+```
+
+After upgrading, verify:
+```bash
+python -c "from transformers import Qwen2VLForConditionalGeneration; print('✓ Success!')"
+```
+
 ### Model Not Loading
 
 If you see "VideoAlign model not available, returning dummy scores":
@@ -175,6 +223,7 @@ If you see "VideoAlign model not available, returning dummy scores":
 1. Check that VideoAlign is cloned: `ls VideoAlign/`
 2. Check that checkpoint exists: `ls hf_cache/VideoReward/`
 3. Verify the checkpoint path in the config matches your setup
+4. Make sure you ran `pip install -e .` in the VideoAlign directory
 
 ### Out of Memory Errors
 
