@@ -403,6 +403,9 @@ def main(_):
     # set seed (device_specific is very important to get different prompts on different devices)
     set_seed(config.seed, device_specific=True)
 
+    # Create explicit device to avoid accelerator.device access issues in multi-GPU setups
+    device = torch.device(f"cuda:{accelerator.process_index}") if torch.cuda.is_available() else torch.device("cpu")
+
     # load scheduler, tokenizer and models.
     pipeline = WanPipeline.from_pretrained(
         config.pretrained.model
@@ -436,13 +439,13 @@ def main(_):
         inference_dtype = torch.bfloat16
 
     # Move transformer, vae and text_encoder to device and cast to inference_dtype
-    pipeline.vae.to(accelerator.device, dtype=torch.float32)
-    pipeline.text_encoder.to(accelerator.device, dtype=inference_dtype)
-    # pipeline.scheduler.to(accelerator.device, dtype=inference_dtype)
+    pipeline.vae.to(device, dtype=torch.float32)
+    pipeline.text_encoder.to(device, dtype=inference_dtype)
+    # pipeline.scheduler.to(device, dtype=inference_dtype)
 
     if config.use_lora:
-        # pipeline.transformer.to(accelerator.device, dtype=inference_dtype)
-        pipeline.transformer.to(accelerator.device)
+        # pipeline.transformer.to(device, dtype=inference_dtype)
+        pipeline.transformer.to(device)
         
         # pipeline.transformer.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 
@@ -475,7 +478,7 @@ def main(_):
     transformer.enable_gradient_checkpointing()
     transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
     # 平均影响到之前的20*8=160个step
-    ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=8, device=accelerator.device)
+    ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=8, device=device)
     
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -504,8 +507,8 @@ def main(_):
     )
 
     # prepare prompt and reward fn
-    reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
-    eval_reward_fn = getattr(flow_grpo.rewards, 'multi_score')(accelerator.device, config.reward_fn)
+    reward_fn = getattr(flow_grpo.rewards, 'multi_score')(device, config.reward_fn)
+    eval_reward_fn = getattr(flow_grpo.rewards, 'multi_score')(device, config.reward_fn)
 
     if config.prompt_fn == "general_ocr":
         train_dataset = TextPromptDataset(config.dataset, 'train')
