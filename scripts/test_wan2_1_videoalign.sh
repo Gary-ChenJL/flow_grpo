@@ -22,6 +22,33 @@ echo ""
 NUM_GPUS=${NUM_GPUS:-1}
 MAIN_PORT=${MAIN_PORT:-29503}
 
+# Check for xformers/PyTorch compatibility
+echo "Checking dependencies..."
+python -c "
+import sys
+try:
+    from diffusers import StableDiffusion3Pipeline, WanPipeline
+    print('✓ Dependencies OK')
+    sys.exit(0)
+except ImportError as e:
+    if '_flash_attention_backward_flop' in str(e) or 'xformers' in str(e):
+        print('✗ XFormers version mismatch detected!')
+        print('')
+        print('SOLUTION: Run the fix script:')
+        print('  ./scripts/fix_dependencies.sh')
+        print('')
+        print('OR set environment variable to disable xformers:')
+        print('  export XFORMERS_DISABLED=1')
+        print('')
+        print('See XFORMERS_FIX.md for details.')
+        sys.exit(1)
+    else:
+        print(f'✗ Import error: {e}')
+        sys.exit(1)
+" || exit 1
+
+echo ""
+
 # Check if VideoAlign checkpoint exists
 VIDEOALIGN_CHECKPOINT="hf_cache/VideoReward"
 if [ ! -d "$VIDEOALIGN_CHECKPOINT" ]; then
